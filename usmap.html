@@ -91,8 +91,6 @@ var states = svg.append("svg:g")
 var circles = svg.append("svg:g")
     .attr("id", "circles");
 
-var ranges = svg.append("svg:g")
-    .attr("id", "ranges");
 
 //var circles = {[]};
 
@@ -126,35 +124,56 @@ airports = airports.forEach(function(airport) {
 
 });
 
+  var expandCircles = function(curid) {
+    //currange = currange - 1; // no earthly clue why this must be decremented
+		for(var r=0; r<Number(numranges); r++) {
+      var myid = "#range" + r + "_" + curid;
+      d3.select(myid).transition().attr("r", 100 * (r + 1));
+    }
+  }
+
+  var shrinkCircles = function(curid) {
+    //currange = currange - 1; // no earthly clue why this must be decremented
+    for(var r=0; r<Number(numranges); r++) {
+      var myid = "#range" + r + "_" + curid;
+      d3.select(myid).transition().attr("r", 10);
+    }
+  }
+
 function start() {
+
+
 
   var g = cells.selectAll("g")
     .data(cities)
     .enter().append("svg:g");
+ 
+  for(var j=0; j<Number(numranges); j++) {
+    var ranges = svg.append("svg:g")
+    .attr("id", "ranges");
 
+    ranges.selectAll("circle")
+    .data(cities)
+    .enter().append("svg:circle")
+    .attr("id", function(d, i) { return ("range".concat(j.toString(), "_", i.toString())); } );
+   
+    ranges.selectAll("circle")
+    .attr("r", 10)
+    .attr("cx", function(d, i) { return positions[i][0]; })
+    .attr("cy", function(d, i) { return positions[i][1]; })
+    .style("fill", "rgb(" + (255-j*50).toString() + ",0,0)")
+    .on("mouseover", function(d, i) { expandCircles(i); })
+    .on("mouseout", function(d, i) { shrinkCircles(i); });
+  } 
+
+ // make sure the city circle is on top
   circles.selectAll("circle")
     .data(cities)
     .enter().append("svg:circle")
     .attr("r", 10)
     .attr("cx", function(d, i) { return positions[i][0]; })
     .attr("cy", function(d, i) { return positions[i][1]; })
-    .on("mouseover", function(d, i) { d3.select("#citycell").text(cities[i]); });
- 
-//  for(r=0; r<numranges; r++) {
-    ranges.selectAll("circle")
-    .data(cities)
-    .enter().append("svg:circle")
-    .attr("id", function(d, i) { return ("range" + i); } );
-   
-    ranges.selectAll("circle")
-    .attr("r", 10)
-    .attr("cx", function(d, i) { return positions[i][0]; })
-    .attr("cy", function(d, i) { return positions[i][1]; })
-    .on("mouseover", function(d, i) { d3.select("#range" + i).transition().attr("r", 100 * (0+1)); })
-    .on("mouseout", function(d, i) { d3.select("#range" + i).transition().attr("r", 10); });
-    
- // }
-
+    .on("mouseover", function(d, i) { d3.select("#citycell").text(cities[i]);})
 }
 
 function setRanges() {
