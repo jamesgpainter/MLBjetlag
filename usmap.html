@@ -23,7 +23,7 @@ path.cell {
 
 circle {
   fill: steelblue;
-  fill-opacity: .8;
+  fill-opacity: .5;
   stroke: #fff;
 }
 
@@ -54,8 +54,8 @@ td {
       <tr>
       <td>
       How many ranges per team?<br>
-      <input type="text" id="numranges">
-      <button type="button" onclick="setRanges();">Ok</button>
+      <input type="text" name="numranges" id="numranges">
+      <button type="button" onclick="sendRequest();">Ok</button>
       </td>
       </table>
     </td>
@@ -67,6 +67,9 @@ td {
     <script type="text/javascript" src="./usmap_files/d3.csv.js"></script>
     <script type="text/javascript" src="./usmap_files/d3.geo.js"></script>
     <script type="text/javascript" src="./usmap_files/d3.geom.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js">
+    </script>
+
     <script type="text/javascript">
 
 var w = 1280,
@@ -108,6 +111,27 @@ var positions = [];
 var locationByAirport = {};
 var cities = [];
 var numranges = 1;
+var wins = [];
+var losses = [];
+
+var phiDistances = [
+  ['ARI',2078],
+  ['CHN',655],
+  ['CIN',722],
+  ['FLO',1043],
+  ['HOU',1348],
+  ['LAN',2387],
+  ['MIL',680],
+  ['NYN',70],
+  ['OAK',2505],
+  ['PIT',251],
+  ['SDN',2368],
+  ['SFN',2513],
+  ['SLN',807],
+  ['TBA',947],
+  ['TEX',1320],
+  ['WAS',137] ];
+
 
 d3.csv("cities.csv", function(airports) {
 
@@ -124,26 +148,59 @@ airports = airports.forEach(function(airport) {
 
 });
 
-  var expandCircles = function(curid) {
-    //currange = currange - 1; // no earthly clue why this must be decremented
-		for(var r=0; r<Number(numranges); r++) {
-      var myid = "#range" + r + "_" + curid;
-      d3.select(myid).transition().attr("r", 100 * (r + 1));
-    }
-  }
+var request;
+var jContent = $( "#citycell" );
+function sendRequest() {
+  $(document).ready(function(){
+    numranges = document.getElementById("numranges").value;
+    $.post("mlb.php",{numranges:numranges},function(result){
+      initializeData(result);
+    });
+  });
+}
 
-  var shrinkCircles = function(curid) {
-    //currange = currange - 1; // no earthly clue why this must be decremented
-    for(var r=0; r<Number(numranges); r++) {
-      var myid = "#range" + r + "_" + curid;
-      d3.select(myid).transition().attr("r", 10);
-    }
+/*
+
+  if(request) {
+    request.abort();
   }
+  var jLink = $(this);
+  var serializedData = $("form").serialize();
+  $("#ajax-status").empty();
+
+  $.ajax(
+    {
+      url: "mlb.php",
+      type: "post",
+      data: serializedData,
+      fail: function() {
+        jContent.html("Page not found");
+      },
+      done: function(strData) {
+        jContent.html(strData);
+      }
+    }
+    );
+}
+*/
+
+var expandCircles = function(curid) {
+  //currange = currange - 1; // no earthly clue why this must be decremented
+  for(var r=0; r<Number(numranges); r++) {
+    var myid = "#range" + r + "_" + curid;
+    d3.select(myid).transition().attr("r", 100 * (r + 1)).duration(150*r);
+  }
+}
+
+var shrinkCircles = function(curid) {
+  //currange = currange - 1; // no earthly clue why this must be decremented
+  for(var r=0; r<Number(numranges); r++) {
+    var myid = "#range" + r + "_" + curid;
+    d3.select(myid).transition().attr("r", 10);
+  }
+}
 
 function start() {
-
-
-
   var g = cells.selectAll("g")
     .data(cities)
     .enter().append("svg:g");
@@ -166,7 +223,7 @@ function start() {
     .on("mouseout", function(d, i) { shrinkCircles(i); });
   } 
 
- // make sure the city circle is on top
+  // make sure the city circle is on top
   circles.selectAll("circle")
     .data(cities)
     .enter().append("svg:circle")
@@ -176,9 +233,29 @@ function start() {
     .on("mouseover", function(d, i) { d3.select("#citycell").text(cities[i]);})
 }
 
-function setRanges() {
-  numranges = document.getElementById("numranges").value;
+function initializeData(strData) {
   start();
+  d3.select("#citycell").text(strData); 
+  numranges = document.getElementById("numranges").value;
+
+  var thresholds = [];
+  for(var r=0; r<numranges; r++) {
+    thresholds[r] = r * (2500 / numranges);
+  }
+  thresholds[numranges] = 2500;
+
+  var windata = $.csv.toArrays(strData);
+  for(var t=0; t<windata.length; t++) {
+    for(var r=0; r<numranages; r++) {
+      if(phiDistances[windata[t][0]] > thresholds[r] &&
+         phiDistances[windata[t][0]] <= thresholds[r+1]) {
+         wins[r] += windata[t][1];
+         losses[r] += windata[t][2];
+      }
+    }
+  }
+
+  d3.select("#citycell").text(strData); 
 }
 
     </script>
