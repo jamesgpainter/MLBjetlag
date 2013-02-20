@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<!-- saved from url=(0039)file:///home/james/Downloads/usmap.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+    <link type="text/css" rel="stylesheet" href="./usmap_files/style.css">
+    <style type="text/css">
+
+#states path {
+  fill: #ccc;
+  stroke: #fff;
+}
+
+path.arc {
+  pointer-events: none;
+  fill: none;
+  stroke: #000;
+  display: none;
+}
+
+path.cell {
+  fill: none;
+  pointer-events: all;
+}
+
+circle {
+  fill: steelblue;
+  fill-opacity: .5;
+  stroke: #fff;
+}
+
+td {
+  font-size: small;
+}
+
+#cells g:hover path.arc {
+  display: inherit;
+}
+
+    </style>
+  </head>
+  <body>
+
+
+  <form onsubmit="javascript:setRanges(this.numranges.value);">
+  <table>
+    <tr>
+    <td id="mapcell">
+    </td>
+    <td>
+      <table>
+      <tr>
+      <td id="citycell">
+      </td>
+      </tr>
+      <tr>
+      <td>
+      How many ranges per team?<br>
+      <input type="text" name="numranges" id="numranges">
+      <button type="button" onclick="sendRequest();">Ok</button>
+      </td>
+      </table>
+    </td>
+    </tr>
+  </table>
+  </form>
+
+    <script type="text/javascript" src="./usmap_files/d3.js"></script>
+    <script type="text/javascript" src="./usmap_files/d3.csv.js"></script>
+    <script type="text/javascript" src="./usmap_files/d3.geo.js"></script>
+    <script type="text/javascript" src="./usmap_files/d3.geom.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js">
+    </script>
+
+    <script type="text/javascript">
+
+var w = 1280,
+    h = 800;
+
+var projection = d3.geo.azimuthal()
+    .mode("equidistant")
+    .origin([-98, 38])
+    .scale(1400)
+    .translate([640, 360]);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var svg = d3.select("#mapcell").insert("svg:svg")
+    .attr("width", w)
+    .attr("height", h);
+
+var states = svg.append("svg:g")
+    .attr("id", "states");
+
+var circles = svg.append("svg:g")
+    .attr("id", "circles");
+
+
+//var circles = {[]};
+
+var cells = svg.append("svg:g")
+    .attr("id", "cells");
+
+d3.json("us-states.json", function(collection) {
+  states.selectAll("path")
+      .data(collection.features)
+    .enter().append("svg:path")
+      .attr("d", path);
+});
+
+var positions = [];
+var locationByAirport = {};
+var cities = [];
+var numranges = 1;
+var wins = [];
+var losses = [];
+
+var phiDistances = [
+  ['ARI',2078],
+  ['CHN',655],
+  ['CIN',722],
+  ['FLO',1043],
+  ['HOU',1348],
+  ['LAN',2387],
+  ['MIL',680],
+  ['NYN',70],
+  ['OAK',2505],
+  ['PIT',251],
+  ['SDN',2368],
+  ['SFN',2513],
+  ['SLN',807],
+  ['TBA',947],
+  ['TEX',1320],
+  ['WAS',137] ];
+
+
+d3.csv("cities.csv", function(airports) {
+
+//var arc = d3.geo.greatArc()
+//  .source(function(d) { return locationByAirport[d.source]; })
+//  .target(function(d) { return locationByAirport[d.target]; });
+
+airports = airports.forEach(function(airport) {
+  var location = [+airport.longitude, +airport.latitude];
+  locationByAirport[airport.iata] = location;
+  positions.push(projection(location));
+  cities.push(airport.city);
+});
+
+});
+
+var request;
+var jContent = $( "#citycell" );
+function sendRequest() {
+  $(document).ready(function(){
+    numranges = document.getElementById("numranges").value;
+    $.post("mlb.php",{numranges:numranges},function(result){
+      initializeData(result);
+    });
+  });
+}
+
+/*
+
+  if(request) {
+    request.abort();
+  }
+  var jLink = $(this);
+  var serializedData = $("form").serialize();
+  $("#ajax-status").empty();
+
+  $.ajax(
+    {
+      url: "mlb.php",
+      type: "post",
+      data: serializedData,
+      fail: function() {
+        jContent.html("Page not found");
+      },
+      done: function(strData) {
+        jContent.html(strData);
+      }
+    }
+    );
+}
+*/
+
+var expandCircles = function(curid) {
+  //currange = currange - 1; // no earthly clue why this must be decremented
+  for(var r=0; r<Number(numranges); r++) {
+    var myid = "#range" + r + "_" + curid;
+    d3.select(myid).transition().attr("r", 100 * (r + 1)).duration(150*r);
+  }
+}
+
+var shrinkCircles = function(curid) {
+  //currange = currange - 1; // no earthly clue why this must be decremented
+  for(var r=0; r<Number(numranges); r++) {
+    var myid = "#range" + r + "_" + curid;
+    d3.select(myid).transition().attr("r", 10);
+  }
+}
+
+function start() {
+  var g = cells.selectAll("g")
+    .data(cities)
+    .enter().append("svg:g");
+ 
+  for(var j=0; j<Number(numranges); j++) {
+    var ranges = svg.append("svg:g")
+    .attr("id", "ranges");
+
+    ranges.selectAll("circle")
+    .data(cities)
+    .enter().append("svg:circle")
+    .attr("id", function(d, i) { return ("range".concat(j.toString(), "_", i.toString())); } );
+   
+    ranges.selectAll("circle")
+    .attr("r", 10)
+    .attr("cx", function(d, i) { return positions[i][0]; })
+    .attr("cy", function(d, i) { return positions[i][1]; })
+    .style("fill", "rgb(" + (255-j*50).toString() + ",0,0)")
+    .on("mouseover", function(d, i) { expandCircles(i); })
+    .on("mouseout", function(d, i) { shrinkCircles(i); });
+  } 
+
+  // make sure the city circle is on top
+  circles.selectAll("circle")
+    .data(cities)
+    .enter().append("svg:circle")
+    .attr("r", 10)
+    .attr("cx", function(d, i) { return positions[i][0]; })
+    .attr("cy", function(d, i) { return positions[i][1]; })
+    .on("mouseover", function(d, i) { d3.select("#citycell").text(cities[i]);})
+}
+
+function initializeData(strData) {
+  start();
+  d3.select("#citycell").text(strData); 
+  numranges = document.getElementById("numranges").value;
+
+  var thresholds = [];
+  for(var r=0; r<numranges; r++) {
+    thresholds[r] = r * (2500 / numranges);
+  }
+  thresholds[numranges] = 2500;
+
+  var windata = $.csv.toArrays(strData);
+  for(var t=0; t<windata.length; t++) {
+    for(var r=0; r<numranages; r++) {
+      if(phiDistances[windata[t][0]] > thresholds[r] &&
+         phiDistances[windata[t][0]] <= thresholds[r+1]) {
+         wins[r] += windata[t][1];
+         losses[r] += windata[t][2];
+      }
+    }
+  }
+
+  d3.select("#citycell").text(strData); 
+}
+
+    </script>
+  
+
+</body></html>
