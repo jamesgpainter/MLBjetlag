@@ -49,7 +49,8 @@ td {
     <td>
     MLB Jetlag Visualizer<br>
     1. Enter a year and number of distance ranges, and click Ok.<br>
-    2. Mouse over a team city. Redder bands correspond to higher winning percentages at cities within the band.
+    2. Mouse over a team city. Redder bands correspond to higher winning<br>percentages at cities within the band.<br>
+    Note: Currently, scale factors are inaccurate, and page may<br>occasionally have to be refreshed due to unresolved bugs.
     </td>
     </tr>
     <td id="mapcell">
@@ -62,15 +63,15 @@ td {
       </tr>
       <tr>
       <td>
-      What year? (2000-2009)<br>
+      What year? (2005-2009)<br>
       <input type="text" name="yearnumber" id="yearnumber">
       </td>
       </tr>
       <tr>
       <td>
-      How many ranges per team?<br>
+      How many ranges per team (2-6)?<br>
       <input type="text" name="numranges" id="numranges">
-      <button type="button" onclick="sendRequest();">Ok</button>
+      <button id="startButton" type="button" onclick="sendRequest(); document.getElementById('startButton').disabled=true;">Ok</button>
       </td>
       </table>
     </td>
@@ -87,41 +88,20 @@ td {
 
     <script type="text/javascript">
 
-var w = 1280,
-    h = 800;
-
+/*
 var projection = d3.geo.azimuthal()
     .mode("equidistant")
     .origin([-98, 38])
     .scale(1400)
     .translate([640, 360]);
+ */
 
-var path = d3.geo.path()
-    .projection(projection);
-
-var svg = d3.select("#mapcell").insert("svg:svg")
-    .attr("width", w)
-    .attr("height", h);
-
-var states = svg.append("svg:g")
-    .attr("id", "states");
-
-var circles = svg.append("svg:g")
-    .attr("id", "circles");
-
-
-//var circles = {[]};
-
-var cells = svg.append("svg:g")
-    .attr("id", "cells");
-
-d3.json("us-states.json", function(collection) {
-  states.selectAll("path")
-      .data(collection.features)
-    .enter().append("svg:path")
-      .attr("d", path);
-});
-
+var projection;
+var path;
+var svg;
+var states;
+var circles;
+var cells;
 var positions = [];
 var locationByAirport = {};
 var cities = [];
@@ -136,22 +116,100 @@ var numdatacollected = 0;
 var totalnumdata = 3;
 var thresholds = [];
 var maxRange = 3000;
+var aspectRatio = 1280 / 800;
+var hMargin = 400;
+var vMargin = 400;
+var origHeight = 800;
+var origWidth = 1280;
+var scale;
+var loadOnce = 0;
 
-d3.csv("mlbcities.csv", function(airports) {
+$(document).load( drawMap(window.innerWidth, window.innerHeight) );
 
-//var arc = d3.geo.greatArc()
-//  .source(function(d) { return locationByAirport[d.source]; })
-//  .target(function(d) { return locationByAirport[d.target]; });
+function drawMap(w, h) {
+  loadOnce++;
+  if(loadOnce > 1) return;
 
-airports = airports.forEach(function(airport) {
-  var location = [+airport.longitude, +airport.latitude];
-  locationByAirport[airport.iata] = location;
-  iatas.push(airport.iata);
-  positions.push(projection(location));
-  cities.push(airport.city);
-});
+  positions = [];
+  locationByAirport = {};
+  cities = [];
+  iatas = [];
+  numranges = 1;
+  yearnumber = 2000;
+  winslosses;
+  wins = [];
+  losses = [];
+  distances = [];
+  numdatacollected = 0;
+  totalnumdata = 3;
+  thresholds = [];
+  maxRange = 3000;
 
-});
+  d3.csv("mlbcities.csv", function(airports) {
+    //var arc = d3.geo.greatArc()
+    //  .source(function(d) { return locationByAirport[d.source]; })
+    //  .target(function(d) { return locationByAirport[d.target]; });
+
+    airports = airports.forEach(function(airport) {
+      var location = [+airport.longitude, +airport.latitude];
+      locationByAirport[airport.iata] = location;
+      iatas.push(airport.iata);
+      positions.push(projection(location));
+      cities.push(airport.city);
+    });
+
+  });
+
+  var translateScale;
+  if(h > w) {
+    mapWidth = w - hMargin;
+    mapHeight = mapWidth / aspectRatio;
+    scale = mapWidth / origWidth;
+  } else {
+    mapHeight = h - vMargin;
+    mapWidth = mapHeight * aspectRatio;
+    scale = mapHeight / origHeight;
+  }
+  if(scale > 1) translateScale = scale;
+  else translateScale = scale * -1;
+
+  projection = [];
+  path = [];
+  svg = [];
+  states = [];
+  circles = [];
+  cells = [];
+
+  projection = d3.geo.azimuthal()
+      .mode("equidistant")
+      .origin([-98, 38])
+      .scale(1400 * scale)
+      .translate([mapWidth/2, mapHeight/2]);
+      //.translate([320 * translateScale, 180 * translateScale]);
+
+  path = d3.geo.path()
+      .projection(projection);
+
+  svg = d3.select("#mapcell").insert("svg:svg")
+      .attr("width", mapWidth)
+      .attr("height", mapHeight);
+
+  states = svg.append("svg:g")
+      .attr("id", "states");
+
+  circles = svg.append("svg:g")
+      .attr("id", "circles");
+  
+  cells = svg.append("svg:g")
+      .attr("id", "cells");
+
+  d3.json("us-states.json", function(collection) {
+    states.selectAll("path")
+        .data(collection.features)
+      .enter().append("svg:path")
+        .attr("d", path);
+  });
+}
 
 function makeLatLongString() {
   var res = '';
@@ -227,12 +285,11 @@ function sendRequest() {
     $.get("distances.php?" + params,{},function(result){
       collectDistances(result);
     });
-/*
-    $.get("teams.php",{},function(result){
-      collectTeams(result);
-    });
-*/
   });
+}
+
+window.onresize = function(event) {
+  drawMap(window.innerWidth, window.innerHeight);
 }
 
 /*
@@ -261,16 +318,15 @@ function sendRequest() {
 */
 
 var expandCircles = function(curid) {
-  //currange = currange - 1; // no earthly clue why this must be decremented
-  for(var r=0; r<Number(numranges); r++) {
+  for(var r=0; r<Number(numranges)-1; r++) {
     var myid = "#range" + r + "_" + curid;
-    d3.select(myid).transition().attr("r", 150 * (r + 1)).duration(150*r);
-    d3.select(myid).style("stroke-width", 150);
+    var scaleFactor = scale * 250 * (5 / numranges);
+    d3.select(myid).transition().attr("r", scaleFactor * (r + 1)).duration(scaleFactor*r);
+    d3.select(myid).style("stroke-width", scaleFactor);
   }
 }
 
 var shrinkCircles = function(curid) {
-  //currange = currange - 1; // no earthly clue why this must be decremented
   for(var r=0; r<Number(numranges); r++) {
     var myid = "#range" + r + "_" + curid;
     d3.select(myid).transition().attr("r", 10);
